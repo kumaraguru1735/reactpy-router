@@ -16,7 +16,7 @@ from reactpy import (
     use_memo,
     use_state,
 )
-from reactpy.backend.hooks import ConnectionContext, use_connection
+from reactpy.backend.hooks import ConnectionContext, use_connection, use_local_storage, use_session_storage
 from reactpy.backend.types import Connection, Location
 from reactpy.core.types import VdomChild, VdomDict
 from reactpy.types import ComponentType, Context, Location
@@ -42,14 +42,14 @@ def create_router(compiler: RouteCompiler[R]) -> Router[R]:
 
 
 @component
-def router_component(
-    *routes: R,
-    compiler: RouteCompiler[R],
-) -> VdomDict | None:
+def router_component(*routes: R, compiler: RouteCompiler[R]) -> VdomDict | None:
     """A component that renders the first matching route using the given compiler"""
 
     old_conn = use_connection()
     location, set_location = use_state(old_conn.location)
+
+    storage = use_local_storage()  # Local storage hook
+    session = use_session_storage()  # Session storage hook
 
     resolvers = use_memo(
         lambda: tuple(map(compiler, _iter_routes(routes))),
@@ -63,7 +63,7 @@ def router_component(
         return html._(
             ConnectionContext(
                 _route_state_context(element, value=_RouteState(set_location, params)),
-                value=Connection(old_conn.scope, location, old_conn.carrier),
+                value=Connection(old_conn.scope, location, storage, session, old_conn.carrier),
             ),
             _history({"on_change": lambda event: set_location(Location(**event))}),
         )
